@@ -1,9 +1,10 @@
 import os
+import sys
 import gradio as gr
 from neo4j import AsyncGraphDatabase
 from google import genai
 
-# Read cloud credentials from environment variables
+# Load environment secrets
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
@@ -29,9 +30,9 @@ async def query_point_in_time(as_of_year: int, target_topic: str = "Hotstar") ->
         result = await session.run(cypher, topic=target_topic, as_of=as_of_iso)
         records = await result.data()
     await driver.close()
-
+    
     if not records:
-        return f"No active relationships found for '{target_topic}' as of July {as_of_year}."
+        return f"No active facts found for '{target_topic}' as of July {as_of_year}."
 
     facts = [f"--- ACTIVE KNOWLEDGE STATE AS OF JULY {as_of_year} ---"]
     for r in records:
@@ -53,19 +54,19 @@ async def handle_ask(query: str):
            toString(r.valid_from) AS valid_from, 
            toString(r.valid_to) AS valid_to,
            r.evidence AS evidence
-    LIMIT 40
+    LIMIT 35
     """
     async with driver.session(database=NEO4J_DATABASE) as session:
         result = await session.run(cypher)
         records = await result.data()
     await driver.close()
-
+    
     lines = [
         f"Fact: {r['source']} --[{r['relation']}]--> {r['target']} "
         f"(Valid: {r['valid_from']} to {r['valid_to'] or 'Present'}) | Evidence: {r['evidence']}" 
         for r in records
     ]
-
+    
     client = genai.Client(api_key=GEMINI_API_KEY)
     prompt = f"Answer using strictly this knowledge graph context:\n{chr(10).join(lines)}\n\nQuestion: {query}"
     res = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
@@ -78,10 +79,10 @@ async def run_ui_timetravel(question: str, year: int, topic: str):
     You are the AURA Temporal Graph Reasoner.
     Answer strictly using the provided point-in-time facts as of year {int(year)}.
     Do NOT include future events that had not occurred yet relative to {int(year)}.
-
+    
     POINT-IN-TIME EVIDENCE:
     {facts}
-
+    
     QUESTION:
     {question}
     """
@@ -91,7 +92,7 @@ async def run_ui_timetravel(question: str, year: int, topic: str):
 with gr.Blocks(title="AURA Bi-Temporal Platform", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# AURA: Bi-Temporal Knowledge Graph Platform")
     gr.Markdown("Autonomous knowledge extraction, historical point-in-time reasoning, and Graph RAG.")
-
+    
     with gr.Tab("Time-Travel Copilot"):
         with gr.Row():
             topic_input = gr.Textbox(label="Topic Focus", value="Hotstar")
@@ -107,7 +108,7 @@ with gr.Blocks(title="AURA Bi-Temporal Platform", theme=gr.themes.Soft()) as dem
             inputs=[historical_question, year_slider, topic_input], 
             outputs=[temporal_output]
         )
-
+        
     with gr.Tab("Ask Graph Copilot"):
         with gr.Row():
             q_input = gr.Textbox(label="General Question", placeholder="e.g., Explain the merger between Viacom18 and Hotstar.")
@@ -117,4 +118,5 @@ with gr.Blocks(title="AURA Bi-Temporal Platform", theme=gr.themes.Soft()) as dem
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
-    demo.launch(server_name="0.0.0.0", server_port=port)
+    # block_thread ensures Render keeps the web server process alive
+    demo.launch(server_name="0.0.0.0", server_port=port, prevent_thread_lock=False)
