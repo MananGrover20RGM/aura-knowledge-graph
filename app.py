@@ -120,3 +120,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     # block_thread ensures Render keeps the web server process alive
     demo.launch(server_name="0.0.0.0", server_port=port, prevent_thread_lock=False)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7860))
+    # block_thread ensures Render keeps the web server process alive
+    demo.launch(server_name="0.0.0.0", server_port=port, prevent_thread_lock=False)
