@@ -2,5 +2,5 @@ gradio>=4.0.0
 neo4j>=5.18.0
 google-genai>=0.1.1
 pydantic>=2.0.0
-crawl4ai
-playwright
+requests>=2.31.0
+beautifulsoup4>=4.12.0
